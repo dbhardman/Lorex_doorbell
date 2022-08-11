@@ -1,1 +1,1 @@
-# custom_components-Lorex_doorbell
+# Lorex_doorbell
