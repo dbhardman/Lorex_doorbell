@@ -11,4 +11,4 @@ Provides for a camera and binary sensors for Motion, Smart Human motion and door
 Has counters for all of the sensors above and provides services for re-setting the counters
 
 Does not yet have the ability to send commands to the doorbell for turning motion/light on and off
-cannot access recodings from the device but camrea can record to Home Assistant
+cannot access recodings from the device but camera can record to Home Assistant
