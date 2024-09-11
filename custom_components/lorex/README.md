@@ -6,9 +6,12 @@ Thanks to @elad-bar
 Also copied and modifed from https://github.com/rroller/dahua
 Thanks to @rroller
 
-Provides for a camera and binary sensors for Motion, Smart Human motion and door bell presses
+Provides for a camera.
+Binary sensors for Motion, and Smart Human motion
+A hass event fot door bell button presses.
 
-Has counters for all of the sensors above and provides services for re-setting the counters
+There are two services, Enable and Disable which can be used for either the motion or smart motion.  This does not disable the Home Assistant entity but stops it from recieving messages from the doorbell.
 
-Does not yet have the ability to send commands to the doorbell for turning motion/light on and off
-cannot access recodings from the device but camera can record to Home Assistant
+The camera is derived from generic camrea nad has all the capbilities of the generic.
+
+
