@@ -60,5 +60,5 @@ LOREX_EVENTS = {
     'CallNoAnswered',
     'WlanWorkMode',
     'LorexConnected',
-
+    
     }

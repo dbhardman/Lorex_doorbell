@@ -208,15 +208,12 @@ class DahuaVTOClient(asyncio.Protocol):
 
             if keep_alive_interval is not None:
                 self.keep_alive_interval = keep_alive_interval - 5
-                # move these so they go sequential one after another
+                # used to call all the version device types right here, 
+                # moved so they go sequential one after another
                 # after event manager started no other info comes from camera
                 # version->devicetype->serial_number->access_control->eventmanager
                 self._connected = True
                 self.load_version()
-                # self.load_serial_number()
-                # self.load_device_type()
-                # self.load_access_control()
-                # self.attach_event_manager()
 
                 Timer(self.keep_alive_interval, self.keep_alive).start()
 
@@ -253,7 +250,7 @@ class DahuaVTOClient(asyncio.Protocol):
 
     # request the version and build date from the device
     def load_version(self):
-        _LOGGER.debug("Get version")
+        _LOGGER.debug("Requesting version")
 
         def handle_version(message):
             params = message.get("params")
@@ -305,6 +302,7 @@ class DahuaVTOClient(asyncio.Protocol):
 
         self.send(DAHUA_CONFIG_MANAGER_GETCONFIG, handle_serial_number, request_data)
 
+    # keep alive  for the event manager
     def keep_alive(self):
         _LOGGER.debug("Keep alive")
 
@@ -346,7 +344,7 @@ class DahuaVTOClient(asyncio.Protocol):
     def create_connect_message(self):
         ctime = time.time()
         time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ctime))
-        data = {"ID": [0], "localeTime": time_str, "UTC": round(ctime, 1)}
+        data = {"ID": [0], "LocaleTime": time_str, "UTC": round(ctime, 1)}
         body = {"Action": "Start", "Code": "LorexConnected", "Data": data}
         message = {"SID": 513, "eventList": [body]}
         return message

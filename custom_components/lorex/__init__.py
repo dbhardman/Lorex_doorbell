@@ -179,7 +179,7 @@ class LorexDevice(DataUpdateCoordinator):
             _LOGGER.debug(f"device type: {self._deviceType} Serial#: {self._serialNumber}")
             self._connected = True
             self.hass.bus.fire("lorex_connection_event", event)
-        # call the listneer for the event  supplied by the entities
+        # call the listener for the event  supplied by the entities
         listener = self._dahua_event_listeners[event_type]
         if listener is not None:
             _LOGGER.debug(f"calling lorex listener: {event_type}")
@@ -193,7 +193,8 @@ class LorexDevice(DataUpdateCoordinator):
     def add_event_listener(self, event_name: str, listener: CALLBACK_TYPE):
         """Adds an event listener for the given event (CrossLineDetection, etc).
         This callback will be called when the event fires"""
-        _LOGGER.info(f"Listener added for: {event_name}")
+        if listener is not None:
+          _LOGGER.info(f"Listener added for: {event_name}")
         self._dahua_event_listeners[event_name] = listener
 
     def camera_device_info(self):
@@ -236,17 +237,18 @@ class LorexDevice(DataUpdateCoordinator):
             # if entry.options.get(platform, True):
             self.platforms.append(platform)
             _LOGGER.info(f"lorex setup platform: {platform}")
+            #TODO async_add_job deprecated change to async_run_hass_job
             self.hass.async_add_job(
                 self.hass.config_entries.async_forward_entry_setup(self._entry, platform)
             )        
 
     def setup_listeners(self):
-        """Add the event listeners for the event sent by the doorbell
+        """Add the event listeners for the events sent by the doorbell
             initially all listeners have a NULL function callback, but they prevent log errors from the vto thread        
         """
         for t in LOREX_EVENTS:
             self.add_event_listener(t, None)
-        # add connection listener to create the binary sensor and camera once the device is connected
+        # add connection listener to create the binary sensors and camera once the device is connected
         self.add_event_listener("LorexConnected", self.create_entities)
 
 
