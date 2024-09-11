@@ -75,7 +75,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         finally:
             transport.close()
 
-        return msg
+        if len(msg[LOREX_ID]) and msg[LOREX_CONNECTION]:
+            return {"title": vol.name, "uuid": msg[LOREX_ID]}
+
+        return {"title": "", "uuid": ""}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -93,24 +96,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         errors = {}
-        if user_input is not None:
-            try:
-                info = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
-                if info is not None:
-                    user_input["uuid"] = info[LOREX_ID]
-                    await self.async_set_unique_id(info[LOREX_ID])
-                    self._abort_if_unique_id_configured()
-                    return self.async_create_entry(
-                        title=user_input["name"], data=user_input
-                    )
+
+        try:
+            info = await validate_input(self.hass, user_input)
+        except CannotConnect:
+            errors["base"] = "cannot_connect"
+        except InvalidAuth:
+            errors["base"] = "invalid_auth"
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("Unexpected exception")
+            errors["base"] = "unknown"
+        else:
+            user_input["uuid"] = info["uuid"]
+            return self.async_create_entry(title=info["title"], data=user_input)
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors

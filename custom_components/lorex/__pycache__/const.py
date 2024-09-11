@@ -7,6 +7,15 @@ VERSION = "0.1.0"
 ISSUE_URL = "https://github.com/dbhardman/Lorex_doorbell/issues"
 
 
+# Device classes - https://www.home-assistant.io/integrations/binary_sensor/#device-class
+"""MOTION_SENSOR_DEVICE_CLASS = "motion"
+SAFETY_DEVICE_CLASS = "safety"
+CONNECTIVITY_DEVICE_CLASS = "connectivity"
+SOUND_DEVICE_CLASS = "sound"
+DOOR_DEVICE_CLASS = "door"
+DOORBELL_DEVICE_CLASS = "ding_dong"
+"""
+
 # Platforms
 BINARY_SENSOR = "binary_sensor"
 SWITCH = "switch"
@@ -23,6 +32,8 @@ CONF_NAME = "name"
 CONF_ENABLED = "enabled"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+# CONF_PORT = "port"
+# CONF_RTSP_PORT = "rtsp_port"
 
 # Defaults
 DEFAULT_NAME = "Lorex"
@@ -76,8 +87,35 @@ LOREX_CONNECTION = "lorex_Connection"
 LOREX_CLIENT = "lorex_Client"
 LOREX_GETTING_EVENTS = "lorex_events"
 LOREX_DOORBELL_CODES = [ALARMLOCAL, INTELLIFRAME, VIDEOMOTION]
+"""Event constants"""
+# DOORBELL_MOTION = "db_motion"
+# DOORBELL_SMART_MOTION = "db_smart_motion"
+# DOORBELL_BUTTON_PRESS = "db_button_pressed"
 
+"""Used in the config flow where we determine the type of device being connected"""
+"""
+LOREX_HANDLED_EVENTS = {
+    "IntelliFrame",
+    "VideoMotion",
+    "AlarmLocal",
+}
+"""
 
-# doorbell eevnt types used for event entity
-LOREX_PRESSED = "pressed"
-LOREX_IDLE = "idle"
+"""these are all the events that we currently do NOT handle
+LOREX_EVENTS = {
+    "VideoMotionInfo",
+    "LeFunctionStatusSync",
+    "NewFile",
+    "TimeChange",
+    "BackKeyLight",
+    "CrossRegionDetection",
+    "AutoRegister",
+    "RtspSessionDisconnect",
+    "RtspSessionState",
+    "NetAbort",
+    "NTPAdjustTime",
+    "PhoneCallDetect",
+    "CallNoAnswered",
+    "WlanWorkMode",
+}
+"""

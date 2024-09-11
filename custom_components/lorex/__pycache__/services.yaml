@@ -1,0 +1,27 @@
+# Describes the format for available lorex services
+# https://developers.home-assistant.io/docs/dev_101_services/
+
+reset_motion_counter:
+  name: Reset motion counter for lorex doorbell
+  description: Resets the counter to zero when called.
+  target:
+    entity:
+      integration: lorex
+      domain: binary_sensor
+
+reset_event_counter:
+  name: Reset doorbell button press counter
+  description: Resets the doorbell button press counter to 0
+  target:
+    entity:
+      integration: lorex
+      domain: event
+
+reset_human_counter:
+  name: Reset doorbell smart human counter
+  description: Resets the doorbell button smart human counter to 0
+  target:
+    entity:
+      integration: lorex
+      domain: binary_sensor
+

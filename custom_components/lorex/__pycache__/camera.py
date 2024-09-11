@@ -31,7 +31,7 @@ async def async_setup_entry(
     lorex_coord: LorexCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     if lorex_coord:
-        async_add_entities([LorexCamera(hass, entry, lorex_coord)])
+        async_add_entities([LorexCamera(hass, lorex_coord)])
 
 
 class LorexCamera(GenericCamera):
@@ -39,9 +39,7 @@ class LorexCamera(GenericCamera):
 
     _device_info: dict[str, Any]
 
-    def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, lorex_coord: LorexCoordinator
-    ) -> None:
+    def __init__(self, hass, lorex_coord: LorexCoordinator) -> None:
         """Initialize a camera from Lorex_device."""
         _LOGGER.debug("Initializing the lorex camera")
         self._device_info = lorex_coord.camera_device_info()
@@ -49,7 +47,7 @@ class LorexCamera(GenericCamera):
         self._device_info[CONF_FRAMERATE] = 2
         self._device_info[CONF_CONTENT_TYPE] = CONF_CONTENT_TYPE
         self._device_info[CONF_VERIFY_SSL] = True
-        self._device_info[CONF_NAME] = entry.data[CONF_NAME]
+        self._device_info[CONF_NAME] = lorex_coord.data[LOREX_MODEL]
         super().__init__(
             hass, self._device_info, lorex_coord.data[LOREX_ID], "doorbell"
         )

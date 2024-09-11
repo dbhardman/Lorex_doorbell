@@ -1,61 +1,58 @@
-"""
-Copied and modified from https://github.com/elad-bar/DahuaVTO2MQTT
-Thanks to @elad-bar
-"""
-import struct
-import sys
-import logging
-import json
+"""API for doorbell."""
+
 import asyncio
 import hashlib
-import time
+import json
+import logging
+import struct
+import sys
 from threading import Timer
-from typing import Optional, Callable, Dict, Any
-import requests
-from requests.auth import HTTPDigestAuth
+from typing import Any, Callable, Dict, Optional
 
-PROTOCOLS = {True: "https", False: "http"}
+from .const import (
+    ALARMLOCAL,
+    DAHUA_BUILD_DATE,
+    DAHUA_CONFIG_MANAGER_GETCONFIG,
+    DAHUA_DEVICE_TYPE,
+    DAHUA_EVENT_MANAGER_ATTACH,
+    DAHUA_GLOBAL_KEEPALIVE,
+    DAHUA_GLOBAL_LOGIN,
+    DAHUA_MAGICBOX_GETDEVICETYPE,
+    DAHUA_MAGICBOX_GETSOFTWAREVERSION,
+    DAHUA_MAGICBOX_GETSYSINFO,
+    DAHUA_SERIAL_NUMBER,
+    DAHUA_VERSION,
+    INTELLIFRAME,
+    LOREX_CLIENT,
+    LOREX_CONNECTION,
+    LOREX_DOORBELL_CODES,
+    LOREX_GETTING_EVENTS,
+    LOREX_ID,
+    LOREX_MODEL,
+    LOREX_TIME_STAMP,
+    VIDEOMOTION,
+)
 
-_LOGGER: logging.Logger = logging.getLogger(__package__)
-
-DAHUA_DEVICE_TYPE = "deviceType"
-DAHUA_SERIAL_NUMBER = "serialNumber"
-DAHUA_UUID = "UUID"
-DAHUA_VERSION = "version"
-DAHUA_BUILD_DATE = "buildDate"
-DAHUA_CONSOLE_RUN_CMD = "console.runCmd"
-DAHUA_GLOBAL_LOGIN = "global.login"
-DAHUA_GLOBAL_KEEPALIVE = "global.keepAlive"
-DAHUA_EVENT_MANAGER_ATTACH = "eventManager.attach"
-DAHUA_CONFIG_MANAGER_GETCONFIG = "configManager.getConfig"
-DAHUA_MAGICBOX_GETSOFTWAREVERSION = "magicBox.getSoftwareVersion"
-DAHUA_MAGICBOX_GETDEVICETYPE = "magicBox.getDeviceType"
-DAHUA_MAGICBOX_GETSYSINFO = "magicBox.getSystemInfo"
-
-DAHUA_ALLOWED_DETAILS = [DAHUA_DEVICE_TYPE, DAHUA_UUID]
+_LOGGER = logging.getLogger(__name__)
 
 
-class DahuaVTOClient(asyncio.Protocol):
-    """This class connects to the doorbell and receives event notifications"""
+class LorexDoorbellClient(asyncio.Protocol):
+    """Handles connection and communication with doorbell."""
 
     requestId: int
     sessionId: int
-    username: str
-    password: str
-    is_ssl: bool
     keep_alive_interval: int
     realm: Optional[str]
     random: Optional[str]
     dahua_details: Dict[str, Any]
     hold_time: int
     data_handlers: Dict[Any, Callable[[Any, str], None]]
+    dahua_config: Dict[str, Any]
+    status: Dict[str, Any]
 
-    def __init__(self, host: str, username: str, password: str, is_ssl: bool, on_event):
+    def __init__(self, config: Dict[str, Any], on_con_lost):
+        self.dahua_config = config
         self.dahua_details = {}
-        self.host = host
-        self.username = username
-        self.password = password
-        self.is_ssl = is_ssl
         self.realm = None
         self.random = None
         self.request_id = 1
@@ -63,19 +60,27 @@ class DahuaVTOClient(asyncio.Protocol):
         self.keep_alive_interval = 0
         self.transport = None
         self.hold_time = 0
-        self.lock_status = {}
         self.data_handlers = {}
-        self._connected = False
+        self.on_con_lost = on_con_lost
+        self.on_event = config["on_event"]
+        self.status = {}
+        self.status[LOREX_CONNECTION] = False
+        self.status[INTELLIFRAME] = False
+        self.status[ALARMLOCAL] = False
+        self.status[VIDEOMOTION] = False
+        self.status[LOREX_MODEL] = ""
+        self.status[LOREX_ID] = ""
+        self.status[LOREX_TIME_STAMP] = ""
+        self.status[LOREX_GETTING_EVENTS] = False
+        self.status[LOREX_CLIENT] = None
 
-        # hook back to HA
-        self._loop = asyncio.get_event_loop()
-        self._on_event = on_event
-
+    # overide of base call will receive message on connect
     def connection_made(self, transport):
         _LOGGER.debug("Connection established")
-        self._connected = True
+
         try:
             self.transport = transport
+
             self.pre_login()
 
         except Exception as ex:
@@ -85,9 +90,13 @@ class DahuaVTOClient(asyncio.Protocol):
                 f"Failed to handle message, error: {ex}, Line: {exc_tb.tb_lineno}"
             )
 
+    # overide of base calls to receive data
     def data_received(self, data):
+        """Override of base class. called when data recieved from the server."""
         try:
             message = self.parse_response(data)
+            _LOGGER.debug(f"Data received: {message}")
+            # print(f"Data: {message}\r\r")
 
             message_id = message.get("id")
 
@@ -102,16 +111,28 @@ class DahuaVTOClient(asyncio.Protocol):
             )
 
     def handle_notify_event_stream(self, params):
+        """Process events recieved from doorbell.
+
+        then send an update to the callback with status.
+        """
         try:
-            _LOGGER.debug(f"Lorex Event: {params}")
+            _LOGGER.debug(f"Event: {params}")
             event_list = params.get("eventList")
 
             for message in event_list:
-                for k in self.dahua_details:
-                    if k in DAHUA_ALLOWED_DETAILS:
-                        message[k] = self.dahua_details.get(k)
-
-                self._on_event(message)
+                code = message.get("Code")
+                data = message.get("Data")
+                if "Action" in data:
+                    action = data.get("Action")
+                else:
+                    action = message.get("Action")
+                if code in LOREX_DOORBELL_CODES:
+                    self.status[LOREX_TIME_STAMP] = data.get("LocaleTime")
+                    if action == "Start":
+                        self.status[code] = True
+                    elif action == "Stop":
+                        self.status[code] = False
+                    self.on_event(self.status)
 
         except Exception as ex:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -126,14 +147,20 @@ class DahuaVTOClient(asyncio.Protocol):
     def eof_received(self):
         _LOGGER.debug("Server sent EOF message")
 
-        self._loop.stop()
-
     def connection_lost(self, exc):
         _LOGGER.error("server closed the connection")
+        self.status[LOREX_CONNECTION] = False
+        self.on_event(self.status)
+        self.on_con_lost.set_result(True)
 
-        self._loop.stop()
+    def close_connection(self):
+        """Close the connection."""
+        self.status[LOREX_CONNECTION] = False
+        self.on_event(self.status)
+        self.transport.close()
 
     def send(self, action, handler, params=None):
+        """Send a command."""
         if params is None:
             params = {}
 
@@ -156,6 +183,7 @@ class DahuaVTOClient(asyncio.Protocol):
 
     @staticmethod
     def convert_message(data):
+        """Remove junk from data."""
         message_data = json.dumps(data, indent=4)
 
         header = struct.pack(">L", 0x20000000)
@@ -171,6 +199,7 @@ class DahuaVTOClient(asyncio.Protocol):
         return message
 
     def pre_login(self):
+        """Send login to doorbell."""
         _LOGGER.debug("Prepare pre-login message")
 
         def handle_pre_login(message):
@@ -192,13 +221,14 @@ class DahuaVTOClient(asyncio.Protocol):
             "clientType": "",
             "ipAddr": "(null)",
             "loginType": "Direct",
-            "userName": self.username,
+            "userName": self.dahua_config["username"],
             "password": "",
         }
 
         self.send(DAHUA_GLOBAL_LOGIN, handle_pre_login, request_data)
 
     def login(self):
+        """Respond to login challenge."""
         _LOGGER.debug("Prepare login message")
 
         def handle_login(message):
@@ -208,26 +238,22 @@ class DahuaVTOClient(asyncio.Protocol):
 
             if keep_alive_interval is not None:
                 self.keep_alive_interval = keep_alive_interval - 5
-                # used to call all the version device types right here, 
-                # moved so they go sequential one after another
-                # after event manager started no other info comes from camera
-                # version->devicetype->serial_number->access_control->eventmanager
-                self._connected = True
-                self.load_version()
-
+                self.status[LOREX_CONNECTION] = True
                 Timer(self.keep_alive_interval, self.keep_alive).start()
+                self.load_version()
 
         password = self._get_hashed_password(
             self.random,
             self.realm,
-            self.username,
-            self.password,
+            self.dahua_config["username"],
+            self.dahua_config["password"],
         )
+        self._hashedPassword = password
         request_data = {
             "clientType": "",
             "ipAddr": "(null)",
             "loginType": "Direct",
-            "userName": self.username,
+            "userName": self.dahua_config["username"],
             "password": password,
             "authorityType": "Default",
         }
@@ -235,6 +261,7 @@ class DahuaVTOClient(asyncio.Protocol):
         self.send(DAHUA_GLOBAL_LOGIN, handle_login, request_data)
 
     def attach_event_manager(self):
+        """Request server send all notifications."""
         _LOGGER.debug("Attach event manager")
 
         def handle_attach_event_manager(message):
@@ -245,12 +272,11 @@ class DahuaVTOClient(asyncio.Protocol):
                 self.handle_notify_event_stream(params)
 
         request_data = {"codes": ["All"]}
-
+        self.status[LOREX_GETTING_EVENTS] = True
         self.send(DAHUA_EVENT_MANAGER_ATTACH, handle_attach_event_manager, request_data)
 
-    # request the version and build date from the device
     def load_version(self):
-        _LOGGER.debug("Requesting version")
+        _LOGGER.debug("Get version")
 
         def handle_version(message):
             params = message.get("params")
@@ -267,7 +293,6 @@ class DahuaVTOClient(asyncio.Protocol):
 
         self.send(DAHUA_MAGICBOX_GETSOFTWAREVERSION, handle_version)
 
-    # request the deviceType ie model of the device
     def load_device_type(self):
         _LOGGER.debug("Get device type")
 
@@ -276,13 +301,13 @@ class DahuaVTOClient(asyncio.Protocol):
             device_type = params.get("type")
 
             self.dahua_details[DAHUA_DEVICE_TYPE] = device_type
+            self.status[LOREX_MODEL] = device_type
 
             _LOGGER.debug(f"Device Type: {device_type}")
             self.load_serial_number()
 
         self.send(DAHUA_MAGICBOX_GETDEVICETYPE, handle_device_type)
 
-    # this does not actually load the serial number but the UUID of the device
     def load_serial_number(self):
         _LOGGER.debug("Get serial number")
 
@@ -291,18 +316,19 @@ class DahuaVTOClient(asyncio.Protocol):
             table = params.get("table", {})
             serial_number = table.get("UUID")
 
-            self.dahua_details[DAHUA_UUID] = serial_number
+            self.dahua_details[DAHUA_SERIAL_NUMBER] = serial_number
+            self.status[LOREX_ID] = serial_number
 
-            _LOGGER.debug(f"UUID: {serial_number}")
-            # _LOGGER.debug(f"config: {message}")
+            _LOGGER.debug(f"Serial Number: {serial_number}")
+            _LOGGER.debug(f"config: {message}")
+            self.status[LOREX_CLIENT] = self
+            self.on_event(self.status)
             # self.attach_event_manager()
-            self.config()
 
         request_data = {"name": "T2UServer"}
 
         self.send(DAHUA_CONFIG_MANAGER_GETCONFIG, handle_serial_number, request_data)
 
-    # keep alive  for the event manager
     def keep_alive(self):
         _LOGGER.debug("Keep alive")
 
@@ -313,45 +339,16 @@ class DahuaVTOClient(asyncio.Protocol):
 
         self.send(DAHUA_GLOBAL_KEEPALIVE, handle_keep_alive, request_data)
 
-    def run_cmd_mute(self, payload: dict):
-        _LOGGER.debug("Keep alive")
-
-        def handle_run_cmd_mute(message):
-            _LOGGER.debug("Call was muted")
-
-        request_data = {"command": "hc"}
-
-        self.send(DAHUA_CONSOLE_RUN_CMD, handle_run_cmd_mute, request_data)
-
-    # gets config data for the devic which includes the "real" serialNumber
-    # once we have that info we can send a connected message and attach
-    # the event stream
     def config(self):
         _LOGGER.debug("Getting config")
 
         def handle_config(message):
             _LOGGER.debug(f"Config: {message}")
-            params = message.get("params")
-            serial_number = params.get("serialNumber")
-            self.dahua_details[DAHUA_SERIAL_NUMBER] = serial_number
-            # send a message that we are connected before we attach the event manager
-            self.handle_notify_event_stream(self.create_connect_message())
             self.attach_event_manager()
 
-        self.send(DAHUA_MAGICBOX_GETSYSINFO, handle_config)
+        request_data = {}
 
-    # create a message to notify that we are connected and give the device type and UUID
-    def create_connect_message(self):
-        ctime = time.time()
-        time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ctime))
-        data = {"ID": [0], "LocaleTime": time_str, "UTC": round(ctime, 1)}
-        body = {"Action": "Start", "Code": "LorexConnected", "Data": data}
-        message = {"SID": 513, "eventList": [body]}
-        return message
-
-    @property
-    def is_connected(self):
-        return self._connected
+        self.send(DAHUA_MAGICBOX_GETSYSINFO, handle_config, request_data)
 
     @staticmethod
     def parse_response(response):
@@ -380,14 +377,6 @@ class DahuaVTOClient(asyncio.Protocol):
         password_str = f"{username}:{realm}:{password}"
         password_bytes = password_str.encode("utf-8")
         password_hash = hashlib.md5(password_bytes).hexdigest().upper()
-        # added this to remove - from the random from 2k camera
-        # change the random_str line to newRandom to have the - removed
-        char_to_remove = "-"
-        newRandom = ""
-        for character in random:
-            if character != char_to_remove:
-                newRandom += character
-
         random_str = f"{username}:{random}:{password_hash}"
         random_bytes = random_str.encode("utf-8")
         random_hash = hashlib.md5(random_bytes).hexdigest().upper()
