@@ -364,11 +364,13 @@ class LorexDoorbellClient(asyncio.Protocol):
         try:
             response_parts = str(response).split("\\x00")
             for response_part in response_parts:
-                if response_part.startswith("{"):
+                if response_part.startswith("{") and not response_part.startswith("{\\x04"):
                     end = response_part.rindex("}") + 1
                     message = response_part[0:end]
 
                     result = json.loads(message)
+                    if len(result):
+                        break
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
