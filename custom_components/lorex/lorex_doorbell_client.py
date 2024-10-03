@@ -164,7 +164,6 @@ class LorexDoorbellClient(asyncio.Protocol):
         self.on_event(self.status)
         if not self.on_con_lost.done():
             self.on_con_lost.set_result(True)
-        # self.transport.close()
 
     def send(self, action, handler, params=None):
         """Send a command."""
@@ -359,12 +358,15 @@ class LorexDoorbellClient(asyncio.Protocol):
 
     @staticmethod
     def parse_response(response):
+        """Convert received data to json."""
         result = None
 
         try:
             response_parts = str(response).split("\\x00")
             for response_part in response_parts:
-                if response_part.startswith("{") and not response_part.startswith("{\\x04"):
+                if response_part.startswith("{") and not response_part.startswith(
+                    "{\\x04"
+                ):
                     end = response_part.rindex("}") + 1
                     message = response_part[0:end]
 

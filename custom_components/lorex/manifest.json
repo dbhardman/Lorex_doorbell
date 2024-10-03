@@ -3,7 +3,7 @@
   "name": "Lorex",
   "config_flow": true,
   "version": "0.1.0",
-  "documentation": "https://www.home-assistant.io/integrations/lorex",
+  "documentation": "https://github.com/dbhardman/Lorex_doorbell/blob/main/README.md",
   "requirements": [],
   "ssdp": [],
   "zeroconf": [],

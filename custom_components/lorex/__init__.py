@@ -5,13 +5,14 @@ import asyncio
 from datetime import timedelta
 import logging
 import sys
+from threading import Timer
 from typing import Any
 
 from homeassistant.components.generic.const import CONF_STREAM_SOURCE
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Config, HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
     ALARMLOCAL,
@@ -73,10 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-    #    hass.data[DOMAIN].pop(entry.entry_id)
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 class LorexCoordinator:
@@ -100,6 +98,8 @@ class LorexCoordinator:
         self._entry = entry
         self._failed_connection = False
         self._connected = False
+        self._hass_closing = False
+        self.reconnect_interval = 60
         # self._dahua_event_listeners: dict[str, CALLBACK_TYPE] = dict()
         self.entity_callbacks = set()
         self.data = {}
@@ -111,11 +111,6 @@ class LorexCoordinator:
         self.data[LOREX_ID] = ""
         self.data[LOREX_TIME_STAMP] = ""
 
-        # super().__init__(
-        #    hass,
-        #    _LOGGER,
-        #    name=f"{DOMAIN} ({entry.unique_id})",
-        # )
         # last thing is to start the doorbell and start recieving events from the device
         asyncio.run_coroutine_threadsafe(self.run_doorbell(), self.hass.loop)
 
@@ -129,6 +124,9 @@ class LorexCoordinator:
         for cb in self.entity_callbacks:
             cb()
         _LOGGER.debug("Event received from API: %s", self.data)
+        # if the connection has closed.  try connect again after interval
+        if not self._connected and not self._hass_closing:
+            Timer(self.reconnect_interval, self.reconnect).start()
         return True
 
     async def async_stop(self, event: Any):
@@ -137,6 +135,7 @@ class LorexCoordinator:
         remove callbacks and close the connection.
         """
         self._failed_connection = True
+        self._hass_closing = True
         self.data[LOREX_CLIENT].close_connection()
 
     def add_callback(self, to_call: Callable[[], None]):
@@ -180,6 +179,17 @@ class LorexCoordinator:
             raise UpdateFailed(f"Error communicating with API: {err}") from err
         return self.data
 
+    def reconnect(self):
+        """Reconnect if Home Assistant not closing.
+
+        Limit retries to once per hour.
+        """
+        self.reconnect_interval += 60
+        if self.reconnect_interval > 3600:
+            self.reconnect_interval = 3600
+        if not self._connected and not self._hass_closing:
+            asyncio.run_coroutine_threadsafe(self.run_doorbell(), self.hass.loop)
+
     async def run_doorbell(self):
         """Run the doorbell client receive messages from client at on_event."""
         cd = {}
@@ -210,3 +220,4 @@ class LorexCoordinator:
             )
         finally:
             transport.close()
+            self._connected = False
