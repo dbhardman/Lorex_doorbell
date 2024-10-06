@@ -12,6 +12,6 @@ A hass event for door bell button presses.
 
 There are two services, Enable and Disable which can be used for either the motion or smart motion.  This does not disable the Home Assistant entity but stops it from recieving messages from the doorbell.
 
-The camera is derived from generic camrea and has all the capbilities of the generic.
+The camera is derived from generic camera and has all the capbilities of the generic.
 
 

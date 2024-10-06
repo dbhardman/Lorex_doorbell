@@ -179,6 +179,11 @@ class LorexHumanMotion(BinarySensorEntity):
     def extra_state_attributes(self):
         """Return attributes."""
         return self._attributes
+    
+    @property
+    def available(self) -> bool:
+        """Return connection state of the doorbell."""
+        return self._coordinator.data[LOREX_CONNECTION]
 
     async def async_enable_updates(self):
         """Handle  SERVICE_ENABLE_UPDATES."""
