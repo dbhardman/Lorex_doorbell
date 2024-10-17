@@ -72,7 +72,11 @@ class LorexPressed(EventEntity):
                     {"extra_data": f"updates_enabled = {self.updates_enabled}"},
                 )
                 self.last_event = LOREX_PRESSED
-        else:
+        elif self.last_event == LOREX_PRESSED:
+            self._trigger_event(
+                LOREX_IDLE,
+                {"extra_data": f"updates_enabled = {self.updates_enabled}"},
+            )
             self.last_event = LOREX_IDLE
         self.async_write_ha_state()
 

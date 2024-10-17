@@ -78,6 +78,6 @@ LOREX_GETTING_EVENTS = "lorex_events"
 LOREX_DOORBELL_CODES = [ALARMLOCAL, INTELLIFRAME, VIDEOMOTION]
 
 
-# doorbell eevnt types used for event entity
+# doorbell event types used for event entity
 LOREX_PRESSED = "pressed"
 LOREX_IDLE = "idle"

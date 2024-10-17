@@ -97,13 +97,12 @@ class LorexDoorbellClient(asyncio.Protocol):
         """Override of base class. called when data recieved from the server."""
         try:
             message = self.parse_response(data)
-            _LOGGER.debug(f"Data received: {message}")
-            # print(f"Data: {message}\r\r")
-
-            message_id = message.get("id")
-
-            handler: Callable = self.data_handlers.get(message_id, self.handle_default)
-            handler(message)
+            if len(message):
+                _LOGGER.debug(f"Data received: {message}")
+                # print(f"Data: {message}\r\r")
+                message_id = message.get("id")
+                handler: Callable = self.data_handlers.get(message_id, self.handle_default)
+                handler(message)
 
         except Exception as ex:
             exc_type, exc_obj, exc_tb = sys.exc_info()
