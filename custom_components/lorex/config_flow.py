@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 from typing import Any
 
 import voluptuous as vol
@@ -13,9 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN, LOREX_CLIENT, LOREX_CONNECTION, LOREX_ID, LorexType
+from .const import DOMAIN, LOREX_CLIENT, LOREX_CONNECTION, LOREX_ID
 from .lorex_doorbell_client import LorexDoorbellClient
-from .lorex_utils import determine_type
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,17 +29,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
-
 msg = {}
-
-
-def message_received(message: dict[str, Any]):
-    """Handle callback for connection from doorbell."""
-    global msg  # noqa: PLW0602
-    msg = message.copy()
-    if message[LOREX_CONNECTION] and len(message[LOREX_ID]):
-        if LOREX_CLIENT in message:
-            message[LOREX_CLIENT].close_connection()
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -54,28 +44,58 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     # )
     global msg  # noqa: PLW0602
 
-    tp: LorexType = determine_type(data["host"])
+    # callback required for closing the connection once established
+    def message_received(message: dict[str, Any]):
+        """Handle callback for connection from doorbell."""
+        global msg  # noqa: PLW0602
+        msg = message.copy()
+        _LOGGER.debug(f"Lorex connection msg {message}")
+        if message[LOREX_CONNECTION] and len(message[LOREX_ID]):
+            if LOREX_CLIENT in message:
+                message[LOREX_CLIENT].close_connection()
+            else:
+                _LOGGER.info("Lorex validation message incorrect")
 
-    if tp == LorexType.DOORBELL:
-        cd = {}
-        cd["username"] = data["username"]
-        cd["password"] = data["password"]
-        cd["port"] = 5000
-        cd["host"] = data["host"]
-        cd["on_event"] = message_received
+    # doorbell listens on port 5000 so connect
+    # so test and give invalid host if not listeneing on that port
 
-        loop = asyncio.get_running_loop()
-        on_con_lost = loop.create_future()
+    sock = socket.socket()
+
+    try:
+        sock.connect((data["host"], 5000))
+    except Exception as ex:
+        _LOGGER.info(f"Lorex doorbell = Invalid host@ {data['host']}")
+        raise InvalidHost
+    finally:
+        sock.close()
+
+    _LOGGER.info("Lorex doorbell = Valid host")
+
+    cd = {}
+    cd["username"] = data["username"]
+    cd["password"] = data["password"]
+    cd["port"] = 5000
+    cd["host"] = data["host"]
+    cd["on_event"] = message_received
+
+    loop = asyncio.get_running_loop()
+    on_con_lost = loop.create_future()
+
+    try:
         transport, protolcol = await loop.create_connection(
             lambda: LorexDoorbellClient(cd, on_con_lost), data["host"], 5000
         )
+    except:
+        raise InvalidAuth
 
-        try:
-            await on_con_lost
-        finally:
-            transport.close()
+    try:
+        await on_con_lost
+    finally:
+        transport.close()
 
-        return msg
+    # if msg["lorex_Connection"] == False:
+    #    raise InvalidAuth
+    return msg
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -100,6 +120,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
+            except InvalidHost:
+                errors["base"] = "invalid_host"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -123,3 +145,7 @@ class CannotConnect(HomeAssistantError):
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""
+
+
+class InvalidHost(HomeAssistantError):
+    """Error to indicate the host is not a doorbell."""

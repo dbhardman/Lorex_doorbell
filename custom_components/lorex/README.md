@@ -14,7 +14,7 @@ The camera is derived from generic camera and has all the capabilities of the ge
 
 The event is stateless (ie the state of the event is the date and time).  The event has attribute event_type  which will be "pressed" or "idle".
 
-below is a yaml example of responding to a doorbell button press
+Below is a yaml example of responding to a doorbell button press
 
 alias: Front doorbell button pressed
 description: Send a notification when the front doorbell is pressed

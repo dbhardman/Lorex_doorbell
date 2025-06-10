@@ -11,7 +11,7 @@ from typing import Any
 from homeassistant.components.generic.const import CONF_STREAM_SOURCE
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP
-from homeassistant.core import Config, HomeAssistant
+from homeassistant.core_config import Config, HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
@@ -185,8 +185,8 @@ class LorexCoordinator:
         Limit retries to once per hour.
         """
         self.reconnect_interval += 60
-        if self.reconnect_interval > 3600:
-            self.reconnect_interval = 3600
+        self.reconnect_interval = min(3600, self.reconnect_interval)
+
         if not self._connected and not self._hass_closing:
             asyncio.run_coroutine_threadsafe(self.run_doorbell(), self.hass.loop)
 

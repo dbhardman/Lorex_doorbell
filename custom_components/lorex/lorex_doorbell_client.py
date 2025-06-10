@@ -89,7 +89,7 @@ class LorexDoorbellClient(asyncio.Protocol):
             exc_type, exc_obj, exc_tb = sys.exc_info()
 
             _LOGGER.error(
-                f"Failed to handle message, error: {ex}, Line: {exc_tb.tb_lineno}"
+                f"Pre-Login failed, error: {ex}, Line: {exc_tb.tb_lineno}"
             )
 
     # overide of base calls to receive data
@@ -97,7 +97,7 @@ class LorexDoorbellClient(asyncio.Protocol):
         """Override of base class. called when data recieved from the server."""
         try:
             message = self.parse_response(data)
-            if len(message):
+            if message is not None:
                 _LOGGER.debug(f"Data received: {message}")
                 # print(f"Data: {message}\r\r")
                 message_id = message.get("id")
@@ -108,7 +108,7 @@ class LorexDoorbellClient(asyncio.Protocol):
             exc_type, exc_obj, exc_tb = sys.exc_info()
 
             _LOGGER.error(
-                f"Failed to handle message, error: {ex}, Line: {exc_tb.tb_lineno}"
+                f"Data_recieved, error: {ex}, Line: {exc_tb.tb_lineno}"
             )
 
     def handle_notify_event_stream(self, params):
@@ -144,7 +144,7 @@ class LorexDoorbellClient(asyncio.Protocol):
 
     def handle_default(self, message):
         """Default message handler."""
-        _LOGGER.debug(f"Data received without handler: {message}")
+        _LOGGER.debug(f"Lorex: Default message handler for: {message}")
 
     def eof_received(self):
         _LOGGER.debug("Server sent EOF message")
@@ -375,7 +375,7 @@ class LorexDoorbellClient(asyncio.Protocol):
             exc_type, exc_obj, exc_tb = sys.exc_info()
 
             _LOGGER.error(
-                f"Failed to read data: {response}, error: {e}, Line: {exc_tb.tb_lineno}"
+                f"Failed to parse response: {response}, error: {e}, Line: {exc_tb.tb_lineno}"
             )
 
         return result

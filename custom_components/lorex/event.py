@@ -62,7 +62,7 @@ class LorexPressed(EventEntity):
 
     @callback
     def _async_handle_event(self) -> None:
-        """Handle the demo button event."""
+        """Handle the button event."""
         _LOGGER.debug("Button event: %s", self._coordinator.data[ALARMLOCAL])
 
         if self._coordinator.data[ALARMLOCAL]:
@@ -81,7 +81,7 @@ class LorexPressed(EventEntity):
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
-        """Register callbacks with data coordinator."""
+        """Register callbacks with coordinator."""
         self._coordinator.add_callback(self._async_handle_event)
 
     async def async_will_remove_from_hass(self) -> None:
