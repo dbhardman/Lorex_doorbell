@@ -6,6 +6,7 @@
         "data": {
           "name": "Device name",
           "host": "Host",
+          "port": "Port",
           "username": "Username",
           "password": "Password"
         }

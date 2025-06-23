@@ -19,6 +19,7 @@ from .const import (
     CONF_NAME,
     CONF_PASSWORD,
     CONF_USERNAME,
+    CONF_PORT,
     DOMAIN,
     INTELLIFRAME,
     LOREX_CLIENT,
@@ -92,7 +93,7 @@ class LorexCoordinator:
         self.username = entry.data[CONF_USERNAME]
         self.password = entry.data[CONF_PASSWORD]
         self.name = entry.data[CONF_NAME]
-        self.port = 5000
+        self.port = entry.data[CONF_PORT]  # 5000
         self.rtsp_port = 554
         self._deviceType = "doorbell"
         self._entry = entry
@@ -195,7 +196,7 @@ class LorexCoordinator:
         cd = {}
         cd["username"] = self.username
         cd["password"] = self.password
-        cd["port"] = 5000
+        cd["port"] = self.port  # 5000
         cd["host"] = self.host
         cd["on_event"] = self.on_event
 

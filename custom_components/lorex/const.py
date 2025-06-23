@@ -23,6 +23,7 @@ CONF_NAME = "name"
 CONF_ENABLED = "enabled"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+CONF_PORT = "port"
 
 # Defaults
 DEFAULT_NAME = "Lorex"

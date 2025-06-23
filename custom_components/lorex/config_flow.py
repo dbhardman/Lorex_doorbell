@@ -24,6 +24,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Optional("name", default="Lorex Doorbell"): str,
         vol.Required("host"): str,
+        vol.Required("port", default=5000): int,
         vol.Required("username", default="admin"): str,
         vol.Required("password"): str,
     }
@@ -62,7 +63,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     sock = socket.socket()
 
     try:
-        sock.connect((data["host"], 5000))
+        sock.connect((data["host"], data["port"]))
     except Exception as ex:
         _LOGGER.info(f"Lorex doorbell = Invalid host@ {data['host']}")
         raise InvalidHost
@@ -74,7 +75,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     cd = {}
     cd["username"] = data["username"]
     cd["password"] = data["password"]
-    cd["port"] = 5000
+    cd["port"] = data["port"]  # 5000
     cd["host"] = data["host"]
     cd["on_event"] = message_received
 
@@ -83,7 +84,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     try:
         transport, protolcol = await loop.create_connection(
-            lambda: LorexDoorbellClient(cd, on_con_lost), data["host"], 5000
+            lambda: LorexDoorbellClient(cd, on_con_lost), data["host"], data["port"]
         )
     except:
         raise InvalidAuth
