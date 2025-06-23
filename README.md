@@ -11,6 +11,6 @@ Provides services for enabling or disabling the motion and smart motion binary s
 
 Does not yet have the ability to send commands to the doorbell for turning motion/light on and off cannot access recodings from the device but camera can record to Home Assistant.
 
-Known to work with model B451AJ.
+Known to work with model B451AJD-F
 
 NOTE: UI setup.
